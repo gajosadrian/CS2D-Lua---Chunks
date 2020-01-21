@@ -24,14 +24,15 @@ function Chunk:new(id, x, y, width, height)
     o.y = y
     o.width = width
     o.height = height
-    o.neighbours = {}
 
+    o.neighbours = {}
+    o.collections = {}
     o.data = {}
 
     return o
 end
 
-function Chunk:addData(key, data)
+function Chunk:setData(key, data)
     self.data[key] = data
 end
 
@@ -39,9 +40,76 @@ function Chunk:removeData(key)
     self.data[key] = nil
 end
 
+function Chunk:addToCollection(channel, data)
+    if not self.collections[channel] then self.collections[channel] = {} end
+    local collection = self.collections[channel]
+    collection[#collection + 1] = data
+end
+
+function Chunk:getIndexesFromCollection(channel, where)
+    local collection = self.collections[channel]
+    local array = {}
+    local counter = 0
+
+    if not collection then return array end
+
+    for i = 1, #collection do
+        local data = collection[i]
+        local valid = true
+
+        if where and type(where) == 'table' then
+            for where_key, where_value in pairs(where) do
+                if data[where_key] ~= where_value then
+                    valid = false
+                    break
+                end
+            end
+        end
+
+        if valid then
+            counter = counter + 1
+            array[counter] = i
+        end
+    end
+
+    return array
+end
+
+function Chunk:getFromCollection(channel, where)
+    local collection = self.collections[channel]
+    local indexes = self:getIndexesFromCollection(channel, where)
+    local array = {}
+
+    if not collection then return array end
+
+    for i = 1, #indexes do
+        local index = indexes[i]
+        array[i] = collection[index]
+    end
+    return array
+end
+
+function Chunk:removeFromCollection(channel, where)
+    local collection = self.collections[channel]
+    local indexes = self:getIndexesFromCollection(channel, where)
+    local counter = 0
+
+    if not collection then return end
+
+    for i = 1, #indexes do
+        local index = indexes[i]
+        table.remove(collection, index - counter)
+        counter = counter + 1
+    end
+end
+
 function Chunk:addNeighbour(id)
     table.insert(self.neighbours, id)
     return self
+end
+
+function Chunk:getNeighbours()
+    return self.neighbours
 end
 
 --[[ MAP CHUNKS CODE ]]
@@ -121,12 +189,12 @@ function Map:mapChunkIdToTiles(chunk_id, x1, y1, x2, y2)
     end
 end
 
-function Map:addData(chunk_id, key, data)
-    self:getChunkById(chunk_id):addData(key, data)
-end
-
-function Map:removeData(chunk_id, key)
-    self:getChunkById(chunk_id):removeData(key)
-end
+-- function Map:addData(chunk_id, key, data)
+--     self:getChunkById(chunk_id):addData(key, data)
+-- end
+--
+-- function Map:removeData(chunk_id, key)
+--     self:getChunkById(chunk_id):removeData(key)
+-- end
 
 return Map
