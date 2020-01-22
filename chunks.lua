@@ -24,14 +24,15 @@ function Chunk:new(id, x, y, width, height)
     o.y = y
     o.width = width
     o.height = height
-    o.neighbours = {}
 
+    o.neighbours = {}
+    o.collections = {}
     o.data = {}
 
     return o
 end
 
-function Chunk:addData(key, data)
+function Chunk:setData(key, data)
     self.data[key] = data
 end
 
@@ -39,9 +40,103 @@ function Chunk:removeData(key)
     self.data[key] = nil
 end
 
-function Chunk:addNeighbour(id)
-    table.insert(self.neighbours, id)
+function Chunk:addToCollection(channel, data)
+    if not self.collections[channel] then self.collections[channel] = {} end
+    local collection = self.collections[channel]
+    collection[#collection + 1] = data
+end
+
+function Chunk:getIndexesFromCollection(channel, where)
+    local collection = self.collections[channel]
+    local array = {}
+    local counter = 0
+
+    if not collection then return array end
+
+    for i = 1, #collection do
+        local data = collection[i]
+        local valid = true
+
+        if where then
+            for where_key, where_value in pairs(where) do
+                if data[where_key] ~= where_value then
+                    valid = false
+                    break
+                end
+            end
+        end
+
+        if valid then
+            counter = counter + 1
+            array[counter] = i
+        end
+    end
+
+    return array
+end
+
+function Chunk:getFromCollection(channel, where, neighbours, array, counter)
+    local collection = self.collections[channel]
+    local indexes = self:getIndexesFromCollection(channel, where)
+    array = array or {}
+    counter = counter or 1
+
+    if collection then
+        for i = 1, #indexes do
+            local index = indexes[counter]
+            array[counter] = collection[index]
+            counter = counter + 1
+        end
+    end
+
+    if neighbours then
+        for i = 1, #self.neighbours do
+            local neighbour_chunk = self.neighbours[i]
+            neighbour_chunk:getFromCollection(channel, where, false, array, counter)
+        end
+    end
+
+    return array
+end
+
+function Chunk:removeFromCollection(channel, where, neighbours)
+    local collection = self.collections[channel]
+
+    if collection then
+        local indexes = self:getIndexesFromCollection(channel, where)
+        local counter = 0
+
+        for i = 1, #indexes do
+            local index = indexes[i]
+            table.remove(collection, index - counter)
+            counter = counter + 1
+        end
+    end
+
+    if neighbours then
+        for i = 1, #self.neighbours do
+            local neighbour_chunk = self.neighbours[i]
+            neighbour_chunk:removeFromCollection(channel, where)
+        end
+    end
+end
+
+function Chunk:changeCollectionChunk(chunk, channel, where)
+    local data = self:getFromCollection(channel, where)
+
+    self:removeFromCollection(channel, where)
+    for i = 1, #data do
+        chunk:addToCollection(channel, data[i])
+    end
+end
+
+function Chunk:addNeighbour(chunk)
+    table.insert(self.neighbours, chunk)
     return self
+end
+
+function Chunk:getNeighbours()
+    return self.neighbours
 end
 
 --[[ MAP CHUNKS CODE ]]
@@ -63,6 +158,26 @@ function Map:new(width, height)
     o:generateChunks()
 
     return o
+end
+
+function Map:initEntity(channel, obj, x, y)
+    local chunk = self:getChunkAt(x, y)
+
+    chunk:addToCollection(channel, obj)
+    obj.chunk_id = chunk.id
+    obj.__address = tostring(obj)
+    obj.__channel = channel
+end
+
+function Map:updateEntity(obj, x, y)
+    local chunk_id = self:getChunkIdAt(x, y)
+
+    if obj.chunk_id ~= chunk_id then
+        local chunk = self:getChunkById(obj.chunk_id)
+        local new_chunk = self:getChunkById(chunk_id)
+        chunk:changeCollectionChunk(new_chunk, obj.__channel, {__address = obj.__address})
+        obj.chunk_id = new_chunk.id
+    end
 end
 
 function Map:getNeighbourChunk(chunk, x_offset, y_offset)
@@ -111,7 +226,7 @@ function Map:generateChunks()
     end
 end
 
--- Mapping chunk ids to tiles
+-- Mapping chunk id to tiles
 function Map:mapChunkIdToTiles(chunk_id, x1, y1, x2, y2)
     for tx = x1, x1 + x2 do
         if not self.tiles[tx] then self.tiles[tx] = {} end
@@ -121,12 +236,20 @@ function Map:mapChunkIdToTiles(chunk_id, x1, y1, x2, y2)
     end
 end
 
-function Map:addData(chunk_id, key, data)
-    self:getChunkById(chunk_id):addData(key, data)
+function Map:setData(chunk_id, key, data)
+    self:getChunkById(chunk_id):setData(key, data)
 end
 
 function Map:removeData(chunk_id, key)
     self:getChunkById(chunk_id):removeData(key)
+end
+
+function Map:addToCollection(chunk_id, channel, where)
+    self:getChunkById(chunk_id):addToCollection(channel, where)
+end
+
+function Map:removeFromCollection(chunk_id, channel, where)
+    self:getChunkById(chunk_id):removeFromCollection(channel, where)
 end
 
 return Map
