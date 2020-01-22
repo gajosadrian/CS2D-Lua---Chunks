@@ -101,10 +101,11 @@ end
 
 function Chunk:removeFromCollection(channel, where, neighbours)
     local collection = self.collections[channel]
-    local indexes = self:getIndexesFromCollection(channel, where)
-    local counter = 0
 
     if collection then
+        local indexes = self:getIndexesFromCollection(channel, where)
+        local counter = 0
+
         for i = 1, #indexes do
             local index = indexes[i]
             table.remove(collection, index - counter)
@@ -122,8 +123,8 @@ end
 
 function Chunk:changeCollectionChunk(chunk, channel, where)
     local data = self:getFromCollection(channel, where)
-    self:removeFromCollection(channel, where)
 
+    self:removeFromCollection(channel, where)
     for i = 1, #data do
         chunk:addToCollection(channel, data[i])
     end
@@ -161,6 +162,7 @@ end
 
 function Map:initEntity(channel, obj, x, y)
     local chunk = self:getChunkAt(x, y)
+
     chunk:addToCollection(channel, obj)
     obj.chunk_id = chunk.id
     obj.__address = tostring(obj)
@@ -224,7 +226,7 @@ function Map:generateChunks()
     end
 end
 
--- Mapping chunk ids to tiles
+-- Mapping chunk id to tiles
 function Map:mapChunkIdToTiles(chunk_id, x1, y1, x2, y2)
     for tx = x1, x1 + x2 do
         if not self.tiles[tx] then self.tiles[tx] = {} end
@@ -249,6 +251,5 @@ end
 function Map:removeFromCollection(chunk_id, channel, where)
     self:getChunkById(chunk_id):removeFromCollection(channel, where)
 end
-
 
 return Map
