@@ -57,7 +57,7 @@ function Chunk:getIndexesFromCollection(channel, where)
         local data = collection[i]
         local valid = true
 
-        if where and type(where) == 'table' then
+        if where then
             for where_key, where_value in pairs(where) do
                 if data[where_key] ~= where_value then
                     valid = false
@@ -75,36 +75,62 @@ function Chunk:getIndexesFromCollection(channel, where)
     return array
 end
 
-function Chunk:getFromCollection(channel, where)
+function Chunk:getFromCollection(channel, where, neighbours, array, counter)
     local collection = self.collections[channel]
     local indexes = self:getIndexesFromCollection(channel, where)
-    local array = {}
+    array = array or {}
+    counter = counter or 1
 
-    if not collection then return array end
-
-    for i = 1, #indexes do
-        local index = indexes[i]
-        array[i] = collection[index]
+    if collection then
+        for i = 1, #indexes do
+            local index = indexes[counter]
+            array[counter] = collection[index]
+            counter = counter + 1
+        end
     end
+
+    if neighbours then
+        for i = 1, #self.neighbours do
+            local neighbour_chunk = self.neighbours[i]
+            neighbour_chunk:getFromCollection(channel, where, false, array, counter)
+        end
+    end
+
     return array
 end
 
-function Chunk:removeFromCollection(channel, where)
+function Chunk:removeFromCollection(channel, where, neighbours)
     local collection = self.collections[channel]
     local indexes = self:getIndexesFromCollection(channel, where)
     local counter = 0
 
-    if not collection then return end
+    if collection then
+        for i = 1, #indexes do
+            local index = indexes[i]
+            table.remove(collection, index - counter)
+            counter = counter + 1
+        end
+    end
 
-    for i = 1, #indexes do
-        local index = indexes[i]
-        table.remove(collection, index - counter)
-        counter = counter + 1
+    if neighbours then
+        for i = 1, #self.neighbours do
+            local neighbour_chunk = self.neighbours[i]
+            neighbour_chunk:removeFromCollection(channel, where)
+        end
     end
 end
 
-function Chunk:addNeighbour(id)
-    table.insert(self.neighbours, id)
+function Chunk:changeCollectionChunk(chunk, channel, where)
+    local data = self:getFromCollection(channel, where)
+    self:removeFromCollection(channel, where)
+
+    for i = 1, #data do
+        chunk:addToCollection(channel, data[i])
+    end
+end
+
+function Chunk:addNeighbour(chunk)
+    table.insert(self.neighbours, chunk)
     return self
 end
 
@@ -131,6 +157,25 @@ function Map:new(width, height)
     o:generateChunks()
 
     return o
+end
+
+function Map:initEntity(channel, obj, x, y)
+    local chunk = self:getChunkAt(x, y)
+    chunk:addToCollection(channel, obj)
+    obj.chunk_id = chunk.id
+    obj.__address = tostring(obj)
+    obj.__channel = channel
+end
+
+function Map:updateEntity(obj, x, y)
+    local chunk_id = self:getChunkIdAt(x, y)
+
+    if obj.chunk_id ~= chunk_id then
+        local chunk = self:getChunkById(obj.chunk_id)
+        local new_chunk = self:getChunkById(chunk_id)
+        chunk:changeCollectionChunk(new_chunk, obj.__channel, {__address = obj.__address})
+        obj.chunk_id = new_chunk.id
+    end
 end
 
 function Map:getNeighbourChunk(chunk, x_offset, y_offset)
@@ -189,12 +234,21 @@ function Map:mapChunkIdToTiles(chunk_id, x1, y1, x2, y2)
     end
 end
 
--- function Map:addData(chunk_id, key, data)
---     self:getChunkById(chunk_id):addData(key, data)
--- end
---
--- function Map:removeData(chunk_id, key)
---     self:getChunkById(chunk_id):removeData(key)
--- end
+function Map:setData(chunk_id, key, data)
+    self:getChunkById(chunk_id):setData(key, data)
+end
+
+function Map:removeData(chunk_id, key)
+    self:getChunkById(chunk_id):removeData(key)
+end
+
+function Map:addToCollection(chunk_id, channel, where)
+    self:getChunkById(chunk_id):addToCollection(channel, where)
+end
+
+function Map:removeFromCollection(chunk_id, channel, where)
+    self:getChunkById(chunk_id):removeFromCollection(channel, where)
+end
+
 
 return Map
