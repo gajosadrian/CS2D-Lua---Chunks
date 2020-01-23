@@ -79,14 +79,14 @@ function Chunk:getFromCollection(channel, where, neighbours, array)
     local collection = self.collections[channel]
     local indexes = self:getIndexesFromCollection(channel, where)
     array = array or {}
-    
+
     if collection then
-        local counter = (array and #array + 1) or 1
+        local counter = (array and #array) or 0
 
         for i = 1, #indexes do
             local index = indexes[i]
-            array[counter] = collection[index]
             counter = counter + 1
+            array[counter] = collection[index]
         end
     end
 
