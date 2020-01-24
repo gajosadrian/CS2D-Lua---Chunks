@@ -75,24 +75,25 @@ function Chunk:getIndexesFromCollection(channel, where)
     return array
 end
 
-function Chunk:getFromCollection(channel, where, neighbours, array, counter)
+function Chunk:getFromCollection(channel, where, neighbours, array)
     local collection = self.collections[channel]
     local indexes = self:getIndexesFromCollection(channel, where)
     array = array or {}
-    counter = counter or 1
 
     if collection then
+        local counter = (array and #array) or 0
+
         for i = 1, #indexes do
-            local index = indexes[counter]
-            array[counter] = collection[index]
+            local index = indexes[i]
             counter = counter + 1
+            array[counter] = collection[index]
         end
     end
 
     if neighbours then
         for i = 1, #self.neighbours do
             local neighbour_chunk = self.neighbours[i]
-            neighbour_chunk:getFromCollection(channel, where, false, array, counter)
+            neighbour_chunk:getFromCollection(channel, where, false, array)
         end
     end
 
